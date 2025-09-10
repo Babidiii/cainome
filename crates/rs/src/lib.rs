@@ -322,16 +322,29 @@ pub fn abi_to_tokenstream(
 
     let reader = utils::str_to_ident(format!("{}Reader", contract_name).as_str());
 
-    tokens.push(quote! {
-        impl<A: starknet::accounts::ConnectedAccount + Sync> #contract_name<A> {
-            #(#views)*
-            #(#externals)*
-        }
+    if execution {
+        tokens.push(quote! {
+            impl<A: starknet::accounts::ConnectedAccount + Sync> #contract_name<A> {
+                #(#views)*
+                #(#externals)*
+            }
 
-        impl<P: starknet::providers::Provider + Sync> #reader<P> {
-            #(#reader_views)*
-        }
-    });
+            impl<P: starknet::providers::Provider + Sync> #reader<P> {
+                #(#reader_views)*
+            }
+        });
+    } else {
+        tokens.push(quote! {
+            impl #contract_name {
+                #(#views)*
+                #(#externals)*
+            }
+
+            impl<P: starknet::providers::Provider + Sync> #reader<P> {
+                #(#reader_views)*
+            }
+        });
+    }
 
     let expanded = quote! {
         #(#tokens)*
