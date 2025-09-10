@@ -113,7 +113,7 @@ impl Parse for ContractAbi {
         };
 
         let mut output_path: Option<String> = None;
-        let mut exeuction = true;
+        let mut execution = true;
         let mut execution_version = ExecutionVersion::V3;
         let mut type_aliases = HashMap::new();
         let mut derives = Vec::new();

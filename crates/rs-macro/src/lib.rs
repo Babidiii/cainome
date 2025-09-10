@@ -35,6 +35,7 @@ fn abigen_internal(input: TokenStream) -> TokenStream {
     let expanded = cainome_rs::abi_to_tokenstream(
         &contract_name.to_string(),
         &abi_tokens,
+        contract_abi.execution,
         contract_abi.execution_version,
         &contract_abi.derives,
         &contract_abi.contract_derives,
@@ -66,6 +67,7 @@ fn abigen_internal_legacy(input: TokenStream) -> TokenStream {
     let expanded = cainome_rs::abi_to_tokenstream(
         &contract_name.to_string(),
         &abi_tokens,
+        true,
         contract_abi.execution_version,
         &contract_abi.derives,
         &contract_abi.contract_derives,
