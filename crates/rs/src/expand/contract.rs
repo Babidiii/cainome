@@ -88,6 +88,13 @@ impl CairoContract {
         quote! {
             #contract_impl
 
+            #[derive(#(#internal_derives,)*)]
+            pub struct #reader<P: #snrs_providers::Provider + Sync> {
+                pub address: #snrs_types::Felt,
+                pub provider: P,
+                pub block_id: #snrs_types::BlockId,
+            }
+
             impl<P: #snrs_providers::Provider + Sync> #reader<P> {
                 pub fn new(
                     address: #snrs_types::Felt,
