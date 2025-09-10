@@ -7,7 +7,11 @@ use super::utils;
 pub struct CairoContract;
 
 impl CairoContract {
-    pub fn expand(contract_name: Ident, contract_derives: &[String]) -> TokenStream2 {
+    pub fn expand(
+        contract_name: Ident,
+        contract_derives: &[String],
+        execution: bool,
+    ) -> TokenStream2 {
         let reader = utils::str_to_ident(format!("{}Reader", contract_name).as_str());
 
         let snrs_types = utils::snrs_types();
@@ -20,43 +24,69 @@ impl CairoContract {
             internal_derives.push(utils::str_to_type(d));
         }
 
-        let q = quote! {
+        let contract_impl = if execution {
+            quote! {
+                #[derive(#(#internal_derives,)*)]
+                pub struct #contract_name<A: #snrs_accounts::ConnectedAccount + Sync> {
+                    pub address: #snrs_types::Felt,
+                    pub account: A,
+                    pub block_id: #snrs_types::BlockId,
+                }
 
-            #[derive(#(#internal_derives,)*)]
-            pub struct #contract_name<A: #snrs_accounts::ConnectedAccount + Sync> {
-                pub address: #snrs_types::Felt,
-                pub account: A,
-                pub block_id: #snrs_types::BlockId,
+                impl<A: #snrs_accounts::ConnectedAccount + Sync> #contract_name<A> {
+                    pub fn new(address: #snrs_types::Felt, account: A) -> Self {
+                        Self { address, account, block_id: #snrs_types::BlockId::Tag(#snrs_types::BlockTag::PreConfirmed) }
+                    }
+
+                    pub fn set_contract_address(&mut self, address: #snrs_types::Felt) {
+                        self.address = address;
+                    }
+
+                    pub fn provider(&self) -> &A::Provider {
+                        self.account.provider()
+                    }
+
+                    pub fn set_block(&mut self, block_id: #snrs_types::BlockId) {
+                        self.block_id = block_id;
+                    }
+
+                    pub fn with_block(self, block_id: #snrs_types::BlockId) -> Self {
+                        Self { block_id, ..self }
+                    }
+                }
+
             }
-
-            impl<A: #snrs_accounts::ConnectedAccount + Sync> #contract_name<A> {
-                pub fn new(address: #snrs_types::Felt, account: A) -> Self {
-                    Self { address, account, block_id: #snrs_types::BlockId::Tag(#snrs_types::BlockTag::PreConfirmed) }
+        } else {
+            quote! {
+                #[derive(#(#internal_derives,)*)]
+                pub struct #contract_name {
+                    pub address: #snrs_types::Felt,
+                    pub block_id: #snrs_types::BlockId,
                 }
 
-                pub fn set_contract_address(&mut self, address: #snrs_types::Felt) {
-                    self.address = address;
+                impl #contract_name {
+                    pub fn new(address: #snrs_types::Felt) -> Self {
+                        Self { address,  block_id: #snrs_types::BlockId::Tag(#snrs_types::BlockTag::PreConfirmed) }
+                    }
+
+                    pub fn set_contract_address(&mut self, address: #snrs_types::Felt) {
+                        self.address = address;
+                    }
+
+                    pub fn set_block(&mut self, block_id: #snrs_types::BlockId) {
+                        self.block_id = block_id;
+                    }
+
+                    pub fn with_block(self, block_id: #snrs_types::BlockId) -> Self {
+                        Self { block_id, ..self }
+                    }
                 }
 
-                pub fn provider(&self) -> &A::Provider {
-                    self.account.provider()
-                }
-
-                pub fn set_block(&mut self, block_id: #snrs_types::BlockId) {
-                    self.block_id = block_id;
-                }
-
-                pub fn with_block(self, block_id: #snrs_types::BlockId) -> Self {
-                    Self { block_id, ..self }
-                }
             }
+        };
 
-            #[derive(#(#internal_derives,)*)]
-            pub struct #reader<P: #snrs_providers::Provider + Sync> {
-                pub address: #snrs_types::Felt,
-                pub provider: P,
-                pub block_id: #snrs_types::BlockId,
-            }
+        quote! {
+            #contract_impl
 
             impl<P: #snrs_providers::Provider + Sync> #reader<P> {
                 pub fn new(
@@ -82,8 +112,6 @@ impl CairoContract {
                     Self { block_id, ..self }
                 }
             }
-        };
-
-        q
+        }
     }
 }

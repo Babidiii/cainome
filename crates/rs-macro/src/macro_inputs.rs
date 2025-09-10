@@ -22,6 +22,7 @@ use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
 use std::path::Path;
 use std::str::FromStr;
+use syn::LitBool;
 use syn::{
     braced,
     ext::IdentExt,
@@ -41,6 +42,7 @@ pub(crate) struct ContractAbi {
     pub abi: Vec<AbiEntry>,
     pub output_path: Option<String>,
     pub type_aliases: HashMap<String, String>,
+    pub execution: bool,
     pub execution_version: ExecutionVersion,
     pub derives: Vec<String>,
     pub contract_derives: Vec<String>,
@@ -111,6 +113,7 @@ impl Parse for ContractAbi {
         };
 
         let mut output_path: Option<String> = None;
+        let mut exeuction = true;
         let mut execution_version = ExecutionVersion::V3;
         let mut type_aliases = HashMap::new();
         let mut derives = Vec::new();
@@ -160,6 +163,13 @@ impl Parse for ContractAbi {
                     parenthesized!(content in input);
                     output_path = Some(content.parse::<LitStr>()?.value());
                 }
+                "execution" => {
+                    let content;
+                    parenthesized!(content in input);
+                    let ev = content.parse::<LitBool>()?.value();
+                    execution = ev;
+                }
+
                 "execution_version" => {
                     let content;
                     parenthesized!(content in input);
@@ -204,6 +214,7 @@ impl Parse for ContractAbi {
             abi,
             output_path,
             type_aliases,
+            execution,
             execution_version,
             derives,
             contract_derives,

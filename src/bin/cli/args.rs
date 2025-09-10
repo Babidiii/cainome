@@ -59,6 +59,11 @@ pub struct CainomeArgs {
     pub execution_version: ExecutionVersion,
 
     #[arg(long)]
+    #[arg(value_name = "EXECUTION")]
+    #[arg(help = "Impl execution or not")]
+    pub execution: bool,
+
+    #[arg(long)]
     #[arg(value_name = "type_skips")]
     #[arg(help = "Types to be skipped from the generated types.")]
     pub type_skips: Option<Vec<String>>,

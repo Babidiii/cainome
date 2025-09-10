@@ -55,7 +55,7 @@ impl CairoFunction {
     pub fn expand(
         func: &Function,
         is_for_reader: bool,
-        execution_version: ExecutionVersion,
+        execution: (bool, ExecutionVersion),
     ) -> TokenStream2 {
         let func_name = &func.name;
         let func_name_ident = utils::str_to_ident(func_name);
@@ -97,83 +97,95 @@ impl CairoFunction {
 
         let ccs = utils::cainome_cairo_serde();
 
-        match &func.state_mutability {
-            StateMutability::View => quote! {
-                #[allow(clippy::ptr_arg)]
-                #[allow(clippy::too_many_arguments)]
-                pub fn #func_name_ident(
-                    &self,
-                    #(#inputs),*
-                ) -> #ccs::call::FCall<#type_param, #out_type> {
-                    use #ccs::CairoSerde;
-
-                    let mut __calldata = vec![];
-                    #(#serializations)*
-
-                    let __call = starknet::core::types::FunctionCall {
-                        contract_address: self.address,
-                        entry_point_selector: starknet::macros::selector!(#func_name),
-                        calldata: __calldata,
-                    };
-
-                    #ccs::call::FCall::new(
-                        __call,
-                        self.provider(),
-                    )
-                }
-            },
-            StateMutability::External => {
-                // For now, ExecutionV1 can't return the list of calls.
-                // This would be helpful to easily access the calls
-                // without having to add `_getcall()` method.
-                // If starknet-rs provides a way to get the calls,
-                // we can remove `_getcall()` method.
-                //
-                // TODO: if it's possible to do it with lifetime,
-                // this can be tried in an issue.
-                let exec_type = utils::str_to_type(&execution_version.get_type_str());
-                let exec_call = execution_version.get_call_str();
-
-                quote! {
-                    #[allow(clippy::ptr_arg)]
-                    #[allow(clippy::too_many_arguments)]
-                    pub fn #func_name_call(
-                        &self,
-                        #(#inputs),*
-                    ) -> starknet::core::types::Call {
-                        use #ccs::CairoSerde;
-
-                        let mut __calldata = vec![];
-                        #(#serializations)*
-
-                        starknet::core::types::Call {
-                            to: self.address,
-                            selector: starknet::macros::selector!(#func_name),
-                            calldata: __calldata,
-                        }
-                    }
-
+        let mut execution_impl = quote! {};
+        if execution.0 {
+            execution_impl = match &func.state_mutability {
+                StateMutability::View => quote! {
                     #[allow(clippy::ptr_arg)]
                     #[allow(clippy::too_many_arguments)]
                     pub fn #func_name_ident(
                         &self,
                         #(#inputs),*
-                    ) -> #exec_type {
+                    ) -> #ccs::call::FCall<#type_param, #out_type> {
                         use #ccs::CairoSerde;
 
                         let mut __calldata = vec![];
                         #(#serializations)*
 
-                        let __call = starknet::core::types::Call {
-                            to: self.address,
-                            selector: starknet::macros::selector!(#func_name),
+                        let __call = starknet::core::types::FunctionCall {
+                            contract_address: self.address,
+                            entry_point_selector: starknet::macros::selector!(#func_name),
                             calldata: __calldata,
                         };
 
-                        #exec_call
+                        #ccs::call::FCall::new(
+                            __call,
+                            self.provider(),
+                        )
+                    }
+                },
+                StateMutability::External => {
+                    let exec_type = utils::str_to_type(&execution.1.get_type_str());
+                    let exec_call = execution.1.get_call_str();
+                    quote! {
+                        #[allow(clippy::ptr_arg)]
+                        #[allow(clippy::too_many_arguments)]
+                        pub fn #func_name_ident(
+                            &self,
+                            #(#inputs),*
+                        ) -> #exec_type {
+                            use #ccs::CairoSerde;
+
+                            let mut __calldata = vec![];
+                            #(#serializations)*
+
+                            let __call = starknet::core::types::Call {
+                                to: self.address,
+                                selector: starknet::macros::selector!(#func_name),
+                                calldata: __calldata,
+                            };
+
+                            #exec_call
+                        }
+                    }
+                }
+            };
+        }
+        let view_impl = if func.state_mutability.eq(&StateMutability::External) {
+            // For now, ExecutionV1 can't return the list of calls.
+            // This would be helpful to easily access the calls
+            // without having to add `_getcall()` method.
+            // If starknet-rs provides a way to get the calls,
+            // we can remove `_getcall()` method.
+            //
+            // TODO: if it's possible to do it with lifetime,
+            // this can be tried in an issue.
+            quote! {
+                #[allow(clippy::ptr_arg)]
+                #[allow(clippy::too_many_arguments)]
+                pub fn #func_name_call(
+                    &self,
+                    #(#inputs),*
+                ) -> starknet::core::types::Call {
+                    use #ccs::CairoSerde;
+
+                    let mut __calldata = vec![];
+                    #(#serializations)*
+
+                    starknet::core::types::Call {
+                        to: self.address,
+                        selector: starknet::macros::selector!(#func_name),
+                        calldata: __calldata,
                     }
                 }
             }
-        }
+        } else {
+            quote! {}
+        };
+
+        return quote! {
+            #execution_impl
+            #view_impl
+        };
     }
 }

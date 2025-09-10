@@ -71,6 +71,8 @@ pub struct Abigen {
     pub types_aliases: HashMap<String, String>,
     /// The version of transaction to be executed.
     pub execution_version: ExecutionVersion,
+    /// implement execution
+    pub execution: bool,
     /// Derives to be added to the generated types.
     pub derives: Vec<String>,
     /// Derives to be added to the generated contract.
@@ -94,6 +96,7 @@ impl Abigen {
             contract_name: contract_name.to_string(),
             abi_source: Utf8PathBuf::from(abi_source),
             types_aliases: HashMap::new(),
+            execution: true,
             execution_version: ExecutionVersion::V1,
             derives: vec![],
             contract_derives: vec![],
@@ -108,6 +111,16 @@ impl Abigen {
     /// * `types_aliases` - Types aliases to avoid name conflicts.
     pub fn with_types_aliases(mut self, types_aliases: HashMap<String, String>) -> Self {
         self.types_aliases = types_aliases;
+        self
+    }
+
+    /// Sets the execution impl or not
+    ///
+    /// # Arguments
+    ///
+    /// * `bool` - impl execution or not
+    pub fn with_execution(mut self, execution: bool) -> Self {
+        self.execution = execution;
         self
     }
 
@@ -159,6 +172,7 @@ impl Abigen {
                 let expanded = abi_to_tokenstream(
                     &self.contract_name,
                     &tokens,
+                    self.execution,
                     self.execution_version,
                     &self.derives,
                     &self.contract_derives,
@@ -193,6 +207,7 @@ impl Abigen {
 pub fn abi_to_tokenstream(
     contract_name: &str,
     abi_tokens: &TokenizedAbi,
+    execution: bool,
     execution_version: ExecutionVersion,
     derives: &[String],
     contract_derives: &[String],
@@ -209,6 +224,7 @@ pub fn abi_to_tokenstream(
     tokens.push(CairoContract::expand(
         contract_name.clone(),
         contract_derives,
+        execution,
     ));
 
     let mut sorted_structs = abi_tokens.structs.clone();
@@ -285,12 +301,22 @@ pub fn abi_to_tokenstream(
         let f = f.to_function().expect("function expected");
         match f.state_mutability {
             StateMutability::View => {
-                reader_views.push(CairoFunction::expand(f, true, execution_version));
-                views.push(CairoFunction::expand(f, false, execution_version));
+                reader_views.push(CairoFunction::expand(
+                    f,
+                    true,
+                    (execution, execution_version),
+                ));
+                views.push(CairoFunction::expand(
+                    f,
+                    false,
+                    (execution, execution_version),
+                ));
             }
-            StateMutability::External => {
-                externals.push(CairoFunction::expand(f, false, execution_version))
-            }
+            StateMutability::External => externals.push(CairoFunction::expand(
+                f,
+                false,
+                (execution, execution_version),
+            )),
         }
     }
 

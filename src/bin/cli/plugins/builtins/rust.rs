@@ -41,6 +41,7 @@ impl BuiltinPlugin for RustPlugin {
             let expanded = cainome_rs::abi_to_tokenstream(
                 &contract_name,
                 &contract.tokens,
+                true,
                 input.execution_version,
                 derives,
                 contract_derives,
